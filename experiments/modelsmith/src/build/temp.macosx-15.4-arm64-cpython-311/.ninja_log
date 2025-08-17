@@ -1,0 +1,8 @@
+# ninja log v5
+1	721	1747756672102298068	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/gemm.o	c305efafa1685401
+1	7505	1747756678845178466	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/kernel_helper.o	6b437a9a4c40e56c
+1	8773	1747756680124865163	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/binary_matmul.o	1917f7bb2a1e1d41
+23	737	1755321193184846135	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/gemm.o	d3189d7280be735e
+24	6302	1755321198712446058	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/kernel_helper.o	97dac5868fbae014
+23	7475	1755321199881078784	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/binary_matmul.o	7f088147a7f0be21
+19	820	1755321919275858243	/Users/bernardyap/Desktop/ModelSmith/experiments/modelsmith/src/build/temp.macosx-15.4-arm64-cpython-311/gemm.o	d3189d7280be735e

@@ -1,0 +1,2 @@
+How do we determine the class of the model in a user-friendly and efficeint way?
+How can an MLE securely pass their model to us? 
