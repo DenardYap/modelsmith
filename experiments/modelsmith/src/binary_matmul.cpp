@@ -1,5 +1,10 @@
+#ifdef TORCH_EXTENSION_NAME
 #include <torch/extension.h>
+#else
+#include <torch/torch.h>
+#endif
 #include <vector>
+#include <chrono>
 
 torch::Tensor pack_binary_matrix_SIMD128(torch::Tensor mat);
 void neon_binary_gemm(const uint8_t* A_packed,
@@ -18,7 +23,9 @@ torch::Tensor binary_matmul(torch::Tensor A_bin,
                                     torch::Tensor B_bin) {
 
     // Step 1 : Check the input tensors, any type is accepted as of now (float, double, int, etc.)
-    TORCH_CHECK(A_bin.size(1) == B_bin.size(0), "Expected second dimension of A_bin to match first dimension of B_bin");   
+    if (A_bin.size(1) != B_bin.size(0)) {
+        throw std::invalid_argument("binary_matmul: shape mismatch");
+    }
     int K = A_bin.size(1);
     auto end = std::chrono::high_resolution_clock::now();
 
@@ -53,7 +60,9 @@ torch::Tensor binary_linear_matmul(torch::Tensor A_bin,
                                     torch::Tensor B_bin) {
 
     // Step 1 : Check the input tensors, any type is accepted as of now (float, double, int, etc.)
-    TORCH_CHECK(A_bin.size(1) == B_bin.size(0), "Expected second dimension of A_bin to match first dimension of B_bin");   
+    if (A_bin.size(1) != B_bin.size(0)) {
+        throw std::invalid_argument("binary_linear_matmul: shape mismatch");
+    }
     int K = A_bin.size(1);
     auto end = std::chrono::high_resolution_clock::now();
 
@@ -89,7 +98,9 @@ torch::Tensor binary_matmul_tiled_with_params(torch::Tensor A_bin,
                                              torch::Tensor B_bin) {
 
     // Step 1 : Check the input tensors
-    TORCH_CHECK(A_bin.size(1) == B_bin.size(0), "Expected second dimension of A_bin to match first dimension of B_bin");   
+    if (A_bin.size(1) != B_bin.size(0)) {
+        throw std::invalid_argument("binary_matmul_tiled_with_params: shape mismatch");
+    }
     int K = A_bin.size(1);
 
     // Making sure only -1 and 1 are present in the matrices A_bin and B_bin
@@ -120,8 +131,11 @@ torch::Tensor binary_matmul_tiled_with_params(torch::Tensor A_bin,
 }
 
 
+
+#ifdef TORCH_EXTENSION_NAME
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("binary_matmul", &binary_matmul, "Binary Matrix Multiplication");
     m.def("binary_matmul_tiled", &binary_matmul_tiled_with_params, "Tiled Binary Matrix Multiplication");
 }
+#endif
 

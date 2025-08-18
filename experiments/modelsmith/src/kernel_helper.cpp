@@ -1,5 +1,15 @@
+#ifdef TORCH_EXTENSION_NAME
 #include <torch/extension.h>
+#else
+#include <torch/torch.h>
+#endif
 #include <vector>
+#if defined(__aarch64__)
+#include <arm_neon.h>
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <immintrin.h>
+#include <emmintrin.h>
+#endif
 
 /**
  * Packs a binary matrix (values must be 0 or 1, or -1/1 which get converted) into a uint8-packed tensor.
@@ -11,7 +21,9 @@
  * TODO: Look into whether if we can use SIMD to speed this up, good enough for now
  */
 torch::Tensor pack_binary_matrix(torch::Tensor mat) {
-    TORCH_CHECK(mat.dim() == 2, "Input must be a 2D tensor");
+    if (mat.dim() != 2) {
+        throw std::invalid_argument("pack_binary_matrix: input must be 2D");
+    }
     mat = mat.to(torch::kUInt8).contiguous(); // Ensure uint8 and contiguous
 
     int rows = mat.size(0);
@@ -41,12 +53,15 @@ torch::Tensor pack_binary_matrix(torch::Tensor mat) {
 /**
  * Pack binary matrix implemented using SIMD instructions.
  */
+#if defined(__aarch64__)
 
- // TODO: TEST
- // TODO: Maybe even pack 32 or 64 elements at a time depends on the matrix size 
- // TODO: For cols not in the multiple of 8, figure out how to handle it 
+// TODO: TEST
+// TODO: Maybe even pack 32 or 64 elements at a time depends on the matrix size 
+// TODO: For cols not in the multiple of 8, figure out how to handle it 
 torch::Tensor pack_binary_matrix_SIMD64(torch::Tensor input) {
-    TORCH_CHECK(input.dim() == 2, "Input must be a 2D tensor");
+    if (input.dim() != 2) {
+        throw std::invalid_argument("pack_binary_matrix_SIMD64: input must be 2D");
+    }
 
     int rows = input.size(0);
     int cols = input.size(1);
@@ -101,8 +116,21 @@ torch::Tensor pack_binary_matrix_SIMD64(torch::Tensor input) {
 /**
  * Pack binary matrix implemented using SIMD instructions.
  */
+#else
+// Fallback on non-AArch64: delegate to scalar packer
+torch::Tensor pack_binary_matrix_SIMD64(torch::Tensor input) {
+    return pack_binary_matrix(input);
+}
+#endif
+
+/**
+ * Pack binary matrix implemented using SIMD instructions.
+ */
+#if defined(__aarch64__)
 torch::Tensor pack_binary_matrix_SIMD128(torch::Tensor input) {
-    TORCH_CHECK(input.dim() == 2, "Input must be a 2D tensor");
+    if (input.dim() != 2) {
+        throw std::invalid_argument("pack_binary_matrix_SIMD128: input must be 2D");
+    }
 
     int rows = input.size(0);
     int cols = input.size(1);
@@ -157,3 +185,66 @@ torch::Tensor pack_binary_matrix_SIMD128(torch::Tensor input) {
 
     return packed;
 }
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+// x86 implementation using SSE2 movemask to pack 16 columns at a time
+static inline uint8_t reverse_bits8(uint8_t x) {
+    x = (uint8_t)(((x & 0xF0u) >> 4) | ((x & 0x0Fu) << 4));
+    x = (uint8_t)(((x & 0xCCu) >> 2) | ((x & 0x33u) << 2));
+    x = (uint8_t)(((x & 0xAAu) >> 1) | ((x & 0x55u) << 1));
+    return x;
+}
+
+torch::Tensor pack_binary_matrix_SIMD128(torch::Tensor input) {
+    if (input.dim() != 2) {
+        throw std::invalid_argument("pack_binary_matrix_SIMD128: input must be 2D");
+    }
+
+    const int rows = input.size(0);
+    const int cols = input.size(1);
+    const int packed_cols = (cols + 7) / 8;
+
+    torch::Tensor packed = torch::empty({rows, packed_cols}, torch::kUInt8);
+    const int8_t* input_ptr = input.data_ptr<int8_t>();
+    uint8_t* packed_ptr = packed.data_ptr<uint8_t>();
+
+    for (int row = 0; row < rows; ++row) {
+        const int8_t* row_ptr = input_ptr + row * cols;
+        uint8_t* out_ptr = packed_ptr + row * packed_cols;
+
+        int col = 0;
+        int out_byte_idx = 0;
+
+        // Process 16 columns at a time with SSE2
+        for (; col + 16 <= cols; col += 16) {
+            const __m128i vals = _mm_loadu_si128((const __m128i*)(row_ptr + col));
+            const __m128i zeros = _mm_setzero_si128();
+            const __m128i gt_zero = _mm_cmpgt_epi8(vals, zeros); // 0xFF where >0
+            const int mask16 = _mm_movemask_epi8(gt_zero);        // 16-bit mask
+
+            const uint8_t low8 = (uint8_t)(mask16 & 0xFF);
+            const uint8_t high8 = (uint8_t)((mask16 >> 8) & 0xFF);
+
+            out_ptr[out_byte_idx++] = reverse_bits8(low8);
+            out_ptr[out_byte_idx++] = reverse_bits8(high8);
+        }
+
+        // Handle remaining columns (up to 16 bits)
+        while (col < cols) {
+            uint8_t byte = 0;
+            for (int b = 0; col < cols && b < 8; ++b, ++col) {
+                const int8_t v = row_ptr[col];
+                const uint8_t bit = (v > 0) ? 1u : 0u;
+                byte |= (uint8_t)(bit << (7 - b));
+            }
+            out_ptr[out_byte_idx++] = byte;
+        }
+    }
+
+    return packed;
+}
+#else
+// Fallback on other architectures: delegate to scalar packer
+torch::Tensor pack_binary_matrix_SIMD128(torch::Tensor input) {
+    return pack_binary_matrix(input);
+}
+#endif

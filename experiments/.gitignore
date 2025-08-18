@@ -3,3 +3,4 @@ libtorch/
 myenv/
 modelsmith_env/
 venv/
+.env
