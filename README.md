@@ -1,11 +1,15 @@
 # FAQs
 
 ## Why are we concern with 1-bit activations and weights?
-### Reason 1: You can achieve very fast matrix multiplication between two matrices containing only -1 and 1, because the dot product between the vectors a and b essentially becomes this formula -> First map -1 (of both a and b) to 0 -> Then do 2 * POPCOUNT( XNOR ( mapped_a, mapped_b ) ) - n, where n is the number of elements in the vector
+### Reason 1: 
+
+You can achieve very fast matrix multiplication between two matrices containing only -1 and 1, because the dot product between the vectors a and b essentially becomes this formula -> First map -1 (of both a and b) to 0 -> Then do 2 * POPCOUNT( XNOR ( mapped_a, mapped_b ) ) - n, where n is the number of elements in the vector
 
 This instruction is much faster than the original dot product instruction.
 
-### Reason 2: Most processors nowadays support 8-bit SIMD instructions, for example, the following C++ intrinsic functions (C++ functions that mapped directly to efficient assembly instructions) perform XNOR between a_vec and b_vec in parallel with 16 8-bit data at a time on a 128-bit register:
+### Reason 2: 
+
+Most processors nowadays support 8-bit SIMD instructions, for example, the following C++ intrinsic functions (C++ functions that mapped directly to efficient assembly instructions) perform XNOR between a_vec and b_vec in parallel with 16 8-bit data at a time on a 128-bit register:
 
 uint8x16_t xnor_vec = vmvnq_u8(veorq_u8(a_vec, b_vec));
 
